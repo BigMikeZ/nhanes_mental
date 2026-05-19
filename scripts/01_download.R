@@ -9,7 +9,7 @@ nhanesTables("Q", 2013)
 
 suffixes <- c("H", "I", "J")
 modules <- list(
-  demo  = "DEMO",
+  DEMO  = "DEMO",
   DPQ   = "DPQ",
   FSQ   = "FSQ",
   SLQ   = "SLQ",
@@ -38,6 +38,4 @@ walk(suffixes, function(suf) {
     }
   })
 })
-
-
 
