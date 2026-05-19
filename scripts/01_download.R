@@ -21,7 +21,7 @@ modules <- list(
 
 walk(suffixes, function(suf) {
   walk2(names(modules), modules, function(label, mod) {
-    table_name <- paste0(mod, "-", suf)
+    table_name <- paste0(mod, "_", suf)
     dest       <- glue::glue("data/raw/{table_name}.rds")
     if(!file.exists(dest)) {
       message("Fetching: ", table_name)
