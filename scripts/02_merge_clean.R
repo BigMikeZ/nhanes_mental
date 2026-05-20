@@ -1,6 +1,4 @@
 library(tidyverse)
-library(nhanesA)
-library(gtsummary)
 
 # Read and join all data
 
