@@ -54,7 +54,7 @@ nhanes_clean <- nhanes_merge |>
   select(
     SEQN, cycle, WTMEC2YR, SDMVPSU, SDMVSTRA, DPQ010:DPQ090, 
     RIDAGEYR, RIAGENDR, RIDRETH3, DMDEDUC2, INDFMPIR, FSDAD,
-    SLD010H, SLD012, PAQ605, PAQ620, HUQ090, SMQ020, SMQ040, 
+    SLD010H, SLD012, PAQ605, PAQ620, SMQ020, SMQ040, 
     ALQ130
     ) |> 
   mutate(
@@ -116,7 +116,7 @@ nhanes_clean |>
   geom_vline(xintercept = 10, color = "red", linetype = "dashed")
 
 nhanes_clean |>
-  select(RIAGENDR, RIDRETH3, DMDEDUC2, FSDAD, PAQ605, PAQ620, HUQ090, SMQ020, SMQ040) |>
+  select(RIAGENDR, RIDRETH3, DMDEDUC2, FSDAD, PAQ605, PAQ620, SMQ020, SMQ040) |>
   map(levels)
 
 nhanes_clean_full <- nhanes_clean |> 
@@ -131,7 +131,7 @@ nhanes_clean_full <- nhanes_clean |>
   ) |> 
   mutate(
     across(
-      c(DMDEDUC2, PAQ605, PAQ620, HUQ090, SMQ020),
+      c(DMDEDUC2, PAQ605, PAQ620, SMQ020),
       ~ if_else(. %in% c("Don't know", "Don't Know", "Refused"), NA, .)
       )
   ) |> 
@@ -178,21 +178,7 @@ nhanes_clean_full <- nhanes_clean |>
       levels = c("Never", "Former", "Current"),
       ordered = TRUE
       )
-  ) |>
-  mutate(
-    HUQ090 = case_when(
-      HUQ090 %in% c("Don't know", "Refused")     ~  NA,
-      HUQ090 == "Yes"                            ~  "Yes",
-      HUQ090 == "No"                             ~  "No"
-    )
-  ) |>
-  mutate(
-    HUQ090 = factor(
-      HUQ090,
-      levels = c("Yes", "No"),
-      ordered = TRUE
-      )
-  ) |> 
+  ) |>  
   mutate(
     ALQ130 = na_if(ALQ130, 999),
     ALQ130 = na_if(ALQ130, 777)
@@ -224,6 +210,6 @@ saveRDS(nhanes_clean_full, "data/processed/nhanes_clean_full.rds")
 
 nhanes_clean <- nhanes_clean_full |> 
   drop_na(depressed, RIDAGEYR, RIAGENDR, RIDRETH3, dmdeduc2_collapsed,
-          INDFMPIR, fsdad_recoded, activity, HUQ090, smoking_status, ALQ130, sleep_hr)
+          INDFMPIR, fsdad_recoded, activity, smoking_status, ALQ130, sleep_hr)
 summary(nhanes_clean)
 saveRDS(nhanes_clean, "data/processed/nhanes_clean.rds")

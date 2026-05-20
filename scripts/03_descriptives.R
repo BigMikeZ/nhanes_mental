@@ -15,7 +15,7 @@ nhanes_svy <- nhanes_clean |>
 summary_table <- tbl_svysummary(
   nhanes_svy,
   by      = depressed,
-  include = c(RIDAGEYR, RIAGENDR, RIDRETH3, INDFMPIR, HUQ090, ALQ130,
+  include = c(RIDAGEYR, RIAGENDR, RIDRETH3, INDFMPIR, ALQ130,
               sleep_hr, phq9_score, dmdeduc2_collapsed, fsdad_recoded, smoking_status,
               activity),
   statistic = list(
@@ -28,7 +28,6 @@ summary_table <- tbl_svysummary(
     RIAGENDR            ~  "Sex",
     RIDRETH3            ~  "Ethnicity",
     INDFMPIR            ~  "Family income-to-poverty ratio",
-    HUQ090              ~  "Seen a mental health professional past year",
     ALQ130              ~  "Alcohol consumption (dirnks/day)",
     sleep_hr            ~  "Sleep duration (hours)",
     phq9_score          ~  "Patient Health Questionnaire (PHQ-9) score",
@@ -45,3 +44,4 @@ summary_table
 summary_table |> 
   as_gt() |> 
   gt::gtsave("output/tables/summary_tb.html")
+class(nhanes_clean$RIAGENDR)
