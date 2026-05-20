@@ -158,14 +158,14 @@ nhanes_clean_full <- nhanes_clean |>
   ) |> 
   mutate(
     smoking_status = case_when( 
-      SMQ020 == "No"  & is.na(SMQ040)                            ~ "Never",
-      SMQ020 == "Yes" & SMQ040 == "Not at all"                   ~ "Former",
-      SMQ020 == "Yes" & SMQ040 %in% c("Some days", "Every day")  ~ "Current"
+      SMQ020 == "No"  & is.na(SMQ040)                            ~   "Never",
+      SMQ020 == "Yes" & SMQ040 == "Not at all"                   ~   "Former",
+      SMQ020 == "Yes" & SMQ040 %in% c("Some days", "Every day")  ~   "Current"
     )
   ) |> 
   mutate(
     smoking_status = factor(
-      SMQ020,
+      smoking_status,
       levels = c("Never", "Former", "Current"),
       ordered = TRUE
       )
@@ -208,14 +208,13 @@ nhanes_clean_full <- nhanes_clean |>
   mutate(
     WTMEC2YR = WTMEC2YR / 3
   ) |> 
-  select(-c(SMQ020, SMQ040, DMDEDUC2, FSDAD, PAQ605, PAQ620)) 
+  select(-c(SMQ020, SMQ040, DMDEDUC2, FSDAD, PAQ605, PAQ620, DPQ010:DPQ090)) 
   
+sumamry(nhanes_clean_full)
 saveRDS(nhanes_clean_full, "data/processed/nhanes_clean_full.rds")
 
 nhanes_clean <- nhanes_clean_full |> 
   drop_na(depressed, RIDAGEYR, RIAGENDR, RIDRETH3, dmdeduc2_collapsed,
-          INDFMPIR, fsdad_recoded, activity, HUQ090, 
-          smoking_status, ALQ130, sleep_hr)
+          INDFMPIR, fsdad_recoded, activity, HUQ090, smoking_status, ALQ130, sleep_hr)
+summary(nhanes_clean)
 saveRDS(nhanes_clean, "data/processed/nhanes_clean.rds")
-
-summary(nhanes_clean_full)
