@@ -40,4 +40,8 @@ summary_table <- tbl_svysummary(
  ) |> 
   add_p() |> 
   add_overall()
+
 summary_table
+summary_table |> 
+  as_gt() |> 
+  gt::gtsave("output/tables/summary_tb.html")
