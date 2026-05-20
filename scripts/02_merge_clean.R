@@ -1,4 +1,8 @@
 library(tidyverse)
+library(nhanesA)
+library(gtsummary)
+
+# Read and join all data
 
 file_pattern <- c(
   DEMO  = "^DEMO",
@@ -36,6 +40,8 @@ nhanes_merge <- file_list$DEMO |>
   left_join(file_list$ALQ, join_by("SEQN")) 
 
 str(nhanes_merge)
+
+# Clean data
 
 nhanes_merge <- nhanes_merge |> 
   rename(cycle = cycle.x) |> 
@@ -81,3 +87,109 @@ nhanes_clean |>
   pivot_longer(everything()) |>
   arrange(desc(value)) |> 
   print(n = 27)
+
+nhanes_clean <- nhanes_clean |> 
+  mutate(
+    across(
+      DPQ010:DPQ090, ~ case_when(
+      . == "Not at all"              ~ 0,
+      . == "Several days"            ~ 1,
+      . == "More than half the days" ~ 2,
+      . == "Nearly every day"        ~ 3,
+      . == "Don't know"              ~ NA_real_,
+      . == "Refused"                 ~ NA_real_
+      )
+    )
+  ) |> 
+  mutate(
+    across(DPQ020:DPQ090, ~ if_else(DPQ010 == 0 & is.na(.), 0, .))
+  ) |> 
+  mutate(
+    phq9_score = rowSums(across(DPQ010:DPQ090), na.rm = FALSE),
+    depressed  = if_else(phq9_score >= 10, 1L, 0L)
+  )
+
+nhanes_clean |> 
+  count(depressed)
+
+nhanes_clean |> 
+  ggplot(aes(x = phq9_score)) + 
+  geom_histogram(binwidth = 1) +
+  geom_vline(xintercept = 10, color = "red", linetype = "dashed")
+
+nhanes_clean |>
+  select(RIAGENDR, RIDRETH3, DMDEDUC2, FSDAD, PAQ605, PAQ620, HUQ090, SMQ020, SMQ040) |>
+  map(levels)
+
+nhanes_clean_full <- nhanes_clean |> 
+  mutate(
+    across(
+      c(DMDEDUC2, PAQ605, PAQ620, HUQ090, SMQ020),
+      ~ if_else(. %in% c("Don't know", "Don't Know", "Refused"), NA, .)
+      )
+  ) |> 
+  mutate(
+    dmdeduc2_collapsed = case_when(
+      DMDEDUC2 %in% c("Less than 9th grade", "9-11th grade (Includes 12th grade with no diploma)") ~ "Less than high school",
+      DMDEDUC2 == "High school graduate/GED or equivalent"                                         ~ "High school/GED",
+      DMDEDUC2 == "Some college or AA degree"                                                      ~ "Some college",
+      DMDEDUC2 == "College graduate or above"                                                      ~ "College graduate+"
+      )
+  ) |> 
+  mutate(
+    dmdeduc2_collapsed = factor(
+      dmdeduc2_collapsed,
+      levels = c("College graduate+", "Some college", 
+                 "High school/GED", "Less than high school")
+      )
+  ) |> 
+  mutate(
+    FSDAD = case_when(
+      FSDAD == "AD full food security: 0"        ~ "Full",
+      FSDAD == "AD marginal food security: 1-2"  ~ "Marginal",
+      FSDAD == "AD low food security: 3-5"       ~ "Low",
+      FSDAD == "AD very low food security: 6-10" ~ "Very low"
+    )
+  ) |> 
+  mutate(
+    fsdad_recoded = factor(
+      FSDAD,
+      levels = c("Full", "Marginal", "Low", "Very low"),
+      ordered = TRUE
+    )
+  ) |> 
+  mutate(
+    smoking_status = case_when( 
+      SMQ020 == "No"  & is.na(SMQ040)                            ~ "Never",
+      SMQ020 == "Yes" & SMQ040 == "Not at all"                   ~ "Former",
+      SMQ020 == "Yes" & SMQ040 %in% c("Some days", "Every day")  ~ "Current"
+    )
+  ) |> 
+  mutate(
+    SMQ020 = factor(
+      SMQ020,
+      levels = c("Never", "Former", "Current"),
+      ordered = TRUE
+      )
+  ) |>
+  mutate(
+    ALQ130 = na_if(ALQ130, 999),
+    ALQ130 = na_if(ALQ130, 777)
+  ) |> 
+  mutate(
+    sleep_hr = if_else(sleep_hr == 99, NA, sleep_hr)
+  ) |> 
+  mutate(
+    WTMEC2YR = WTMEC2YR / 3
+  ) |> 
+  select(-c(SMQ020, SMQ040, DMDEDUC2, FSDAD)) 
+  
+saveRDS(nhanes_clean_full, "data/processed/nhanes_clean_full.rds")
+
+nhanes_clean <- nhanes_clean_full |> 
+  drop_na(depressed, RIDAGEYR, RIAGENDR, RIDRETH3, dmdeduc2_collapsed,
+          INDFMPIR, fsdad_recoded, PAQ605, PAQ620, HUQ090, 
+          smoking_status, ALQ130, sleep_hr)
+saveRDS(nhanes_clean, "data/processed/nhanes_clean.rds")
+
+  
