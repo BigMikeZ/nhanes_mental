@@ -121,6 +121,15 @@ nhanes_clean |>
 
 nhanes_clean_full <- nhanes_clean |> 
   mutate(
+    depressed = case_when(
+      depressed  == 1   ~   "Yes",
+      depressed  == 0   ~   "No"
+    )
+  ) |> 
+  mutate(
+    depressed = factor(depressed)
+  ) |> 
+  mutate(
     across(
       c(DMDEDUC2, PAQ605, PAQ620, HUQ090, SMQ020),
       ~ if_else(. %in% c("Don't know", "Don't Know", "Refused"), NA, .)
@@ -210,7 +219,7 @@ nhanes_clean_full <- nhanes_clean |>
   ) |> 
   select(-c(SMQ020, SMQ040, DMDEDUC2, FSDAD, PAQ605, PAQ620, DPQ010:DPQ090)) 
   
-sumamry(nhanes_clean_full)
+summary(nhanes_clean_full)
 saveRDS(nhanes_clean_full, "data/processed/nhanes_clean_full.rds")
 
 nhanes_clean <- nhanes_clean_full |> 
