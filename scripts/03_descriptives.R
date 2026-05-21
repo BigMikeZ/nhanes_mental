@@ -46,7 +46,6 @@ summary_table
 summary_table |> 
   as_gt() |> 
   gt::gtsave("output/tables/summary_tb.html")
-class(nhanes_clean$RIAGENDR)
 
 nhanes_clean_full |> 
   select(depressed, RIAGENDR, RIDRETH3, dmdeduc2_collapsed,
@@ -60,12 +59,12 @@ missing_tbl <- nhanes_clean_full |>
       (is.na(ALQ130)) | (is.na(depressed)) | (is.na(INDFMPIR)) | (is.na(dmdeduc2_collapsed)) | 
       (is.na(fsdad_recoded)),
       levels = c(TRUE, FALSE),
-      labels = c("Complete", "Any missing")
+      labels = c("Any missing", "Complete")
     )
   ) |> 
   tbl_summary(
     by = any_missing,
-    include = c(ALQ130, depressed, INDFMPIR, dmdeduc2_collapsed),
+    include = c(ALQ130, depressed, INDFMPIR, dmdeduc2_collapsed, fsdad_recoded),
     missing = "no",
     statistic = list(
       all_continuous()  ~ "{mean} ({sd})",
@@ -76,13 +75,19 @@ missing_tbl <- nhanes_clean_full |>
       INDFMPIR            ~  "Family income-to-poverty ratio",
       ALQ130              ~  "Alcohol consumption (dirnks/day)",
       depressed           ~  "Depressed",
-      dmdeduc2_collapsed  ~  "Education"
+      dmdeduc2_collapsed  ~  "Education",
+      fsdad_recoded       ~  "Food security"
     )
   ) |> 
   add_p()
-
+missing_tbl
 missing_tbl |>
   as_gt() |> 
   gt::gtsave("output/tables/missing_tbl.html")
 
+nhanes_clean_full |>
+  summarise(across(everything(), ~ sum(is.na(.)))) |>
+  pivot_longer(everything()) |>
+  filter(value > 0) |>
+  arrange(desc(value))
 
