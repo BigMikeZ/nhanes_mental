@@ -14,6 +14,8 @@ nhanes_svy <- nhanes_clean |>
     nest    = TRUE
   )
 
+# Generate summary table
+
 summary_table <- tbl_svysummary(
   nhanes_svy,
   by      = depressed,
@@ -46,6 +48,8 @@ summary_table
 summary_table |> 
   as_gt() |> 
   gt::gtsave("output/tables/summary_tb.html")
+
+# Generate missingness table
 
 nhanes_clean_full |> 
   select(depressed, RIAGENDR, RIDRETH3, dmdeduc2_collapsed,
@@ -85,9 +89,16 @@ missing_tbl |>
   as_gt() |> 
   gt::gtsave("output/tables/missing_tbl.html")
 
-nhanes_clean_full |>
-  summarise(across(everything(), ~ sum(is.na(.)))) |>
-  pivot_longer(everything()) |>
-  filter(value > 0) |>
-  arrange(desc(value))
+# Check multi-collinearity
+nhanes_clean |>
+  select(RIDAGEYR, INDFMPIR, ALQ130, sleep_hr) |>
+  cor(use = "complete.obs") |>
+  round(2)
 
+nhanes_clean |>
+  group_by(dmdeduc2_collapsed) |>
+  summarise(mean_income = mean(INDFMPIR, na.rm = TRUE))
+
+nhanes_clean |>
+  group_by(fsdad_recoded) |>
+  summarise(mean_income = mean(INDFMPIR, na.rm = TRUE))
