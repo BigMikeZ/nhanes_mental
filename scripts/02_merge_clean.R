@@ -54,8 +54,8 @@ nhanes_clean <- nhanes_merge |>
   select(
     SEQN, cycle, WTMEC2YR, SDMVPSU, SDMVSTRA, DPQ010:DPQ090, 
     RIDAGEYR, RIAGENDR, RIDRETH3, DMDEDUC2, INDFMPIR, FSDAD,
-    SLD010H, SLD012, PAQ605, PAQ620, SMQ020, SMQ040, 
-    ALQ130
+    SLD010H, SLD012, PAQ605, PAQ620, SMQ020, SMQ040, ALQ111,
+    ALQ121, ALQ130
     ) |> 
   mutate(
     across(c(SEQN, WTMEC2YR, SDMVPSU, SDMVSTRA, RIDAGEYR, INDFMPIR,
@@ -184,6 +184,13 @@ nhanes_clean_full <- nhanes_clean |>
     ALQ130 = na_if(ALQ130, 777)
   ) |> 
   mutate(
+    ALQ130 = case_when(
+      ALQ111 == "No"                     ~ 0,
+      ALQ121 == "Never in the last year" ~ 0,
+      TRUE                               ~ ALQ130
+    )
+  ) |> 
+  mutate(
     activity = case_when(
       PAQ605 == "No"  & PAQ620 == "No"               ~  "None",
       PAQ605 == "No"  & PAQ620 == "Yes"              ~  "Moderate",
@@ -203,7 +210,7 @@ nhanes_clean_full <- nhanes_clean |>
   mutate(
     WTMEC2YR = WTMEC2YR / 3
   ) |> 
-  select(-c(SMQ020, SMQ040, DMDEDUC2, FSDAD, PAQ605, PAQ620, DPQ010:DPQ090)) 
+  select(-c(SMQ020, SMQ040, DMDEDUC2, FSDAD, PAQ605, ALQ111, ALQ121, PAQ620, DPQ010:DPQ090)) 
   
 summary(nhanes_clean_full)
 saveRDS(nhanes_clean_full, "data/processed/nhanes_clean_full.rds")
