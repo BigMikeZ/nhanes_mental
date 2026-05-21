@@ -1,8 +1,10 @@
 library(srvyr)
 library(tidyverse)
 library(gtsummary)
+library(naniar)
 
 nhanes_clean <- read_rds("data/processed/nhanes_clean.rds")
+nhanes_clean_full <- readRDS("data/processed/nhanes_clean_full.rds")
 
 nhanes_svy <- nhanes_clean |> 
   as_survey_design(
@@ -45,3 +47,42 @@ summary_table |>
   as_gt() |> 
   gt::gtsave("output/tables/summary_tb.html")
 class(nhanes_clean$RIAGENDR)
+
+nhanes_clean_full |> 
+  select(depressed, RIAGENDR, RIDRETH3, dmdeduc2_collapsed,
+         INDFMPIR, fsdad_recoded, activity, smoking_status, 
+         ALQ130, sleep_hr) |> 
+  miss_var_summary()
+
+missing_tbl <- nhanes_clean_full |> 
+  mutate(
+    any_missing = factor(
+      (is.na(ALQ130)) | (is.na(depressed)) | (is.na(INDFMPIR)) | (is.na(dmdeduc2_collapsed)) | 
+      (is.na(fsdad_recoded)),
+      levels = c(TRUE, FALSE),
+      labels = c("Complete", "Any missing")
+    )
+  ) |> 
+  tbl_summary(
+    by = any_missing,
+    include = c(ALQ130, depressed, INDFMPIR, dmdeduc2_collapsed),
+    missing = "no",
+    statistic = list(
+      all_continuous()  ~ "{mean} ({sd})",
+      all_categorical() ~ "{p}%"
+    ),
+    digits = list(all_continuous() ~ 1, all_categorical() ~ 1),
+    label  = list(
+      INDFMPIR            ~  "Family income-to-poverty ratio",
+      ALQ130              ~  "Alcohol consumption (dirnks/day)",
+      depressed           ~  "Depressed",
+      dmdeduc2_collapsed  ~  "Education"
+    )
+  ) |> 
+  add_p()
+
+missing_tbl |>
+  as_gt() |> 
+  gt::gtsave("output/tables/missing_tbl.html")
+
+
