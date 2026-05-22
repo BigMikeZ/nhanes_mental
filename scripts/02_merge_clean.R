@@ -201,6 +201,7 @@ nhanes_clean_full <- nhanes_clean |>
       levels = c("Vigorous", "Moderate", "None")
       )
   ) |> 
+  mutate(RIDETH3 = relevel(RIDRETH3, ref = "Non-Hispanic White")) |> 
   mutate(
     sleep_hr = if_else(sleep_hr == 99, NA, sleep_hr)
   ) |> 
