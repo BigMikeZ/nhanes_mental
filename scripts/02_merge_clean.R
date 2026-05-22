@@ -161,8 +161,7 @@ nhanes_clean_full <- nhanes_clean |>
   mutate(
     fsdad_recoded = factor(
       FSDAD,
-      levels = c("Full", "Marginal", "Low", "Very low"),
-      ordered = TRUE
+      levels = c("Full", "Marginal", "Low", "Very low")
     )
   ) |> 
   mutate(
@@ -175,8 +174,7 @@ nhanes_clean_full <- nhanes_clean |>
   mutate(
     smoking_status = factor(
       smoking_status,
-      levels = c("Never", "Former", "Current"),
-      ordered = TRUE
+      levels = c("Never", "Former", "Current")
       )
   ) |>  
   mutate(
@@ -200,8 +198,7 @@ nhanes_clean_full <- nhanes_clean |>
   mutate(
     activity = factor(
       activity,
-      levels = c("Vigorous", "Moderate", "None"),
-      ordered = TRUE
+      levels = c("Vigorous", "Moderate", "None")
       )
   ) |> 
   mutate(
