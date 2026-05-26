@@ -2,6 +2,8 @@ library(tidyverse)
 library(tidymodels)
 library(survey)
 library(gtsummary)
+library(doParallel)
+library(vip)
 
 nhanes_clean <- read_rds("data/processed/nhanes_clean.rds")
 
@@ -12,20 +14,6 @@ nhanes_svy_model <- svydesign(
   nest   = TRUE,
   data   = nhanes_clean
 ) 
-
-#Build logistic regression model
-model_logistic <- svyglm(
-  depressed ~ RIDAGEYR + RIAGENDR + RIDRETH3 + dmdeduc2_collapsed +
-    INDFMPIR + fsdad_recoded + activity + smoking_status +
-    ALQ130 + sleep_hr,
-  design = nhanes_svy_model,
-  family = quasibinomial()
-)
-summary(model_logistic)  
-
-tbl_regression(model_logistic, exponentiate = TRUE) |> 
-  as_gt() |> 
-  gt::gtsave("output/tables/logistic_summary.html")
 
 # Check linearity assumption (logit outcome on predictors)
 model_glm <- glm(
@@ -55,6 +43,35 @@ ggplot(check_data, aes(logit, predictor.value))+
 
 # Check influential values (cook's distance)
 plot(model_glm, which = 4, id.n = 3)
+
+#Build logistic regression model
+model_logistic <- svyglm(
+  depressed ~ RIDAGEYR + RIAGENDR + RIDRETH3 + dmdeduc2_collapsed +
+    log(INDFMPIR + 0.01) + fsdad_recoded + activity + smoking_status +
+    ALQ130 + sleep_hr,
+  design = nhanes_svy_model,
+  family = quasibinomial()
+)
+summary(model_logistic)  
+
+tbl_regression(
+  model_logistic, 
+  exponentiate = TRUE,
+  label = list(
+    RIDAGEYR                    ~ "Age (years)",
+    RIAGENDR                    ~ "Sex",
+    RIDRETH3                    ~ "Race/Ethnicity",
+    dmdeduc2_collapsed          ~ "Education",
+    `log(INDFMPIR + 0.01)`      ~ "Income-to-poverty ratio (log)",
+    fsdad_recoded               ~ "Food Security",
+    activity                    ~ "Physical Activity",
+    smoking_status              ~ "Smoking Status",
+    ALQ130                      ~ "Avg Drinks/Day",
+    sleep_hr                    ~ "Sleep Duration (hours)"
+  )
+  ) |> 
+  as_gt() |> 
+  gt::gtsave("output/tables/logistic_summary.html")
 
 # Build LASSO
 set.seed(123)
@@ -126,3 +143,68 @@ last_fit_result |>
   collect_predictions() |>
   roc_curve(truth = depressed, .pred_Yes, event_level = "second") |>
   autoplot()
+
+# Random forest
+rf_recipe <- recipe(depressed ~ ., data = nhanes_train) |> 
+  update_role(SEQN, cycle, WTMEC2YR, SDMVPSU, SDMVSTRA, phq9_score,
+              new_role = "ID") |> 
+  step_dummy(all_nominal_predictors()) |>
+  step_zv(all_predictors())
+
+rf_spec <- rand_forest(
+  trees = 100,
+  mtry  = tune(),
+  min_n = tune()
+) |> 
+  set_engine("ranger", importance = "permutation") |>
+  set_mode("classification")
+
+rf_workflow <- workflow() |> 
+  add_recipe(rf_recipe) |> 
+  add_model(rf_spec)
+
+set.seed(123)
+rf_grid <- grid_random(
+  mtry(range = c(2, 10)),
+  min_n(range = c(5, 50)),
+  size = 20
+)  
+
+cl <- makePSOCKcluster(parallel::detectCores() - 1)
+registerDoParallel(cl)
+getDoParWorkers()
+
+set.seed(123)
+rf_tune <- tune_grid(
+  rf_workflow,
+  resamples = nhanes_folds,
+  grid      = rf_grid,
+  metrics   = metric_set(roc_auc)
+)
+stopCluster(cl)
+
+autoplot(rf_tune)
+show_best(rf_tune, metric = "roc_auc")
+
+best_rf <- select_best(rf_tune, metric = "roc_auc")
+
+final_rf_workflow <- rf_workflow |>
+  finalize_workflow(best_rf)
+
+set.seed(123)
+rf_last_fit <- final_rf_workflow |>
+  last_fit(nhanes_split, metrics = metric_set(roc_auc))
+
+collect_metrics(rf_last_fit)
+
+rf_last_fit |>
+  collect_predictions() |>
+  roc_curve(truth = depressed, .pred_Yes, event_level = "second") |>
+  autoplot()
+
+rf_final_fit <- final_rf_workflow |>
+  fit(data = nhanes_train)
+
+rf_last_fit |>
+  extract_fit_parsnip() |>
+  vip(num_features = 20)
