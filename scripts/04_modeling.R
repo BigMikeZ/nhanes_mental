@@ -126,17 +126,14 @@ best_lambda
 final_workflow <- lasso_workflow |>
   finalize_workflow(best_lambda)
 
-final_fit <- final_workflow |>
-  fit(data = nhanes_train)
+last_fit_result <- final_workflow |>
+  last_fit(nhanes_split, metrics = metric_set(roc_auc))
 
-final_fit |>
+last_fit |>
   extract_fit_parsnip() |>
   tidy() |>
   filter(estimate != 0) |>
   arrange(desc(abs(estimate)))
-
-last_fit_result <- final_workflow |>
-  last_fit(nhanes_split, metrics = metric_set(roc_auc))
 
 collect_metrics(last_fit_result)
 last_fit_result |>
@@ -202,9 +199,10 @@ rf_last_fit |>
   roc_curve(truth = depressed, .pred_Yes, event_level = "second") |>
   autoplot()
 
-rf_final_fit <- final_rf_workflow |>
-  fit(data = nhanes_train)
-
 rf_last_fit |>
   extract_fit_parsnip() |>
   vip(num_features = 20)
+
+saveRDS(model_logistic, "output/models/model_logistic.rds")
+saveRDS(last_fit_result, "output/models/lasso_final_fit.rds")
+saveRDS(rf_last_fit, "output/models/rf_last_fit.rds")
