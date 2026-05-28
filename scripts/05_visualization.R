@@ -181,6 +181,7 @@ prev_data |>
     title = "Depression Prevalence by Key Subgroups",
     caption = "Error bars represent 95% confidence intervals. NHANES 2013-18."
   )
+ggsave("output/figures/weighted_prevalence.png")
 
 # Construct model comparison plot
 set.seed(123)
@@ -215,4 +216,4 @@ model_comp |>
     title = "Model Comparison: Discriminative Performance",
     caption = "Dashed line represents random chance (AUC = 0.5). NHANES 2013-18."
   )
-  
+ggsave("output/figures/model_comparison.png")  
