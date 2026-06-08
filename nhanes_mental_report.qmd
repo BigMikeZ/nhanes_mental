@@ -1,0 +1,364 @@
+---
+title: "Depression and Its Social Determinants: A Multi-Model Analysis Using NHANES 2013–2018"
+author: "Mike Zhang"
+date: today
+format: 
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    theme: cosmo
+    self-contained: true
+    output-file: index.html
+    output-dir: docs
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: set-up
+library(tidyverse)
+library(srvyr)
+library(gtsummary)
+library(broom)
+library(tidymodels)
+library(vip)
+
+nhanes_clean <- readRDS("data/processed/nhanes_clean.rds")
+nhanes_svy <- nhanes_clean |> 
+  as_survey_design(
+    ids     = SDMVPSU,
+    strata  = SDMVSTRA,
+    weights = WTMEC2YR,
+    nest    = TRUE
+  )
+```
+
+# Background
+
+Depression is one of the most prevalent mental health conditions worldwide, affecting an estimated 280 million people globally. In the United States, it represents a leading cause of disability and is associated with substantial economic costs, reduced quality of life, and increased mortality risk.
+
+While depression has well-established biological and psychological underpinnings, its distribution across populations is far from random. Social determinants, meaning the conditions in which people are born, grow, work, and age, play a meaningful role in shaping depression risk. Food insecurity, poverty, low educational attainment, and smoking have all been linked to higher depression prevalence in prior research, yet their relative importance and independence after mutual adjustment remains incompletely characterized.
+
+This project uses three complementary analytical approaches, such as survey-weighted logistic regression, LASSO, and random forest, to examine which social determinants are most strongly and consistently associated with depression among US adults, using data from the National Health and Nutrition Examination Survey (NHANES) 2013–2018.
+
+# Methods
+
+## Data Source
+
+Data were drawn from three cycles of the National Health and Nutrition Examination Survey (NHANES): 2013-2014, 2015–2016, and 2017–2018. NHANES is a nationally representative, cross-sectional survey conducted by the Centers for Disease Control and Prevention (CDC) that combines interviews, questionnaires, and physical examinations to assess the health and nutritional status of the US civilian non-institutionalized population. Survey weights were adjusted for the multi-cycle design by dividing the provided examination weights by three, and all descriptive analyses accounted for the complex survey design using pseudo-strata and pseudo-PSU variables.
+
+## Study Sample
+
+The analytic sample was restricted to adults aged 18 and older. After excluding respondents with missing data on the outcome or key predictors, the final sample comprised `{r} nrow(nhanes_clean)` participants.
+
+## Outcome 
+
+Depression was assessed using the Patient Health Questionnaire-9 (PHQ-9), a validated nine-item instrument asking respondents how often they experienced depressive symptoms over the past two weeks. Each item is scored 0–3, with a total score ranging from 0–27. Consistent with established clinical thresholds, respondents scoring 10 or above were classified as having moderate-to-severe depression.
+
+## Predictors
+
+Social determinants examined included food security status (four levels: full, marginal, low, very low), family income-to-poverty ratio (log-transformed based on assumption checking), education (four levels: college graduate or above, some college, high school/GED, less than high school), smoking status (never, former, current), physical activity (vigorous, moderate, none), average alcohol consumption (drinks per day), and sleep duration (hours per night). Demographic covariates included age, sex, and race/ethnicity.
+
+## Missing Data
+
+Missing data were handled via complete case analysis. A substantial proportion of missingness in alcohol consumption (ALQ130) was structural since respondents who reported never drinking or not drinking in the past year were skipped past the relevant question entirely. These were recoded as 0 drinks per day prior to analysis, recovering 1,272 additional observations. Remaining missingness was assessed for systematic patterns; lower-income and less-educated respondents were modestly overrepresented among those with missing data, suggesting findings should be interpreted with some caution. A table comparing the characteristics of complete and incomplete cases of key predictors is provided in the Appendix.
+
+## Statistical Analysis
+
+Three complementary models were fitted:
+
+Survey-weighted logistic regression was used as the primary inferential model, estimating odds ratios for each predictor while accounting for NHANES's complex survey design via `svyglm()` with a quasibinomial family. This model provides interpretable effect estimates with appropriate confidence intervals and p-values.
+
+LASSO (Least Absolute Shrinkage and Selection Operator) was fitted via the `tidymodels` framework to perform variable selection by identifying which social determinants survive penalization after controlling for all others. The penalty parameter λ was tuned via 10-fold cross-validation using AUC as the performance metric, with the final λ selected using the one standard error rule to favor parsimony.
+
+Random forest was fitted using the `ranger` engine via `tidymodels`, with `mtry` and `min_n` tuned via random grid search and 10-fold cross-validation. Permutation importance was used to rank predictors by their contribution to model performance.
+
+For the LASSO and random forest models, data were split into 80% training and 20% test sets prior to analysis. Model performance was evaluated on the held-out test set using AUC. All analyses were conducted in R version 4.6.
+
+# Results 
+
+## Sample Characteristics
+
+```{r}
+#| label: tbl-1
+#| tbl-cap: "Baseline characteristics of U.S. adults aged 18 and older by depression status, NHANES 2013–2018 (n = 10350). Values represent weighted population estimates presented as mean (SD) for continuous variables and n (%) for categorical variables"
+
+tbl_svysummary(
+  nhanes_svy,
+  by      = depressed,
+  include = c(RIDAGEYR, RIAGENDR, RIDRETH3, INDFMPIR, ALQ130,
+              sleep_hr, phq9_score, dmdeduc2_collapsed, fsdad_recoded, smoking_status,
+              activity),
+  statistic = list(
+    all_continuous()  ~ "{mean} ({sd})",
+    all_categorical() ~ "{p}%"
+  ),
+  digits = list(all_continuous() ~ 1, all_categorical() ~ 1),
+  label   = list(
+    RIDAGEYR            ~  "Age (years)",
+    RIAGENDR            ~  "Sex",
+    RIDRETH3            ~  "Ethnicity",
+    INDFMPIR            ~  "Family income-to-poverty ratio",
+    ALQ130              ~  "Alcohol consumption (dirnks/day)",
+    sleep_hr            ~  "Sleep duration (hours)",
+    phq9_score          ~  "Patient Health Questionnaire (PHQ-9) score",
+    dmdeduc2_collapsed  ~  "Education",
+    fsdad_recoded       ~  "Food security",
+    smoking_status      ~  "Smoking status",
+    activity            ~  "Physical activity"
+  )
+ ) |> 
+  add_p() |> 
+  add_overall()
+```
+
+The final analytic sample comprised 10,350 US adults, representing an estimated 164 million Americans after survey weighting. The weighted prevalence of moderate-to-severe depression was 7.9%. The sample was approximately evenly split by sex (50.1% female), with a mean age of 46.9 years. Non-Hispanic White adults comprised the largest racial/ethnic group (67.4%), followed by Non-Hispanic Black (10.2%), Mexican American (8.1%), and Other Hispanic (5.5%) adults. About three-quarters of respondents reported full food security (74.3%), while 7.6% reported very low food security. Current smokers comprised 19.7% of the sample. Full sample characteristics are presented in @tbl-1.
+
+## Depression Prevalence by Subgroup
+
+```{r}
+#| label: fig-1
+#| fig-cap: "Weighted Depression Prevalence by key subgroups among U.S. adults aged 18 and older, NHANES 2013-18."
+#| 
+prev_data <- bind_rows(
+  nhanes_svy |>
+    group_by(group = fsdad_recoded, depressed) |>
+    summarise(pct = survey_mean() * 100) |>
+    filter(depressed == "Yes") |>
+    mutate(category = "Food Security"),
+  nhanes_svy |>
+    group_by(group = smoking_status, depressed) |>
+    summarise(pct = survey_mean() * 100) |>
+    filter(depressed == "Yes") |>
+    mutate(category = "Smoking Status"),
+  nhanes_svy |>
+    group_by(group = RIAGENDR, depressed) |>
+    summarise(pct = survey_mean() * 100) |>
+    filter(depressed == "Yes") |>
+    mutate(category = "Sex")
+) |>
+  mutate(group = as.character(group))
+
+prev_data |> 
+  mutate(group = factor(group, levels = c(
+    "Very low", "Low", "Marginal", "Full",
+    "Female", "Male",
+    "Current", "Former", "Never"
+  ))) |> 
+  ggplot(aes(x = pct, y = fct_reorder2(group, pct, category), fill = category)) +
+  geom_col() +
+  geom_errorbar(
+    aes(xmin = pct - 1.96 * pct_se, xmax = pct + 1.96 * pct_se), 
+    width = 0.2,
+    linewidth = 0.5,
+    orientation = "y"
+  ) +
+  scale_fill_brewer(palette = "Set2") +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  labs(
+    x = "Weighted prevalence of depression (%)", 
+    y = NULL,
+    fill = "Subgroup",
+    title = "Depression Prevalence by Key Subgroups",
+    caption = "Error bars represent 95% confidence intervals. NHANES 2013-18."
+  )
+```
+
+Depression prevalence varied substantially across subgroups (@fig-1). The steepest gradient was observed for food security — prevalence ranged from 4.9% among those with full food security to 22.6% among those with very low food security, a more than fourfold difference. Current smokers had nearly three times the depression prevalence of never smokers (16.0% vs. 5.3%). Female adults had approximately twice the prevalence of male adults (10.1% vs. 5.7%).
+
+## Logistic Regression
+
+```{r}
+#| label: tbl-2
+#| tbl-cap: "Survey-weighted logistic regression model estimates for depression among U.S. adults aged 18 and older, NHANES 2013–2018 (n = 10350)."
+
+model_logistic <- read_rds("output/models/model_logistic.rds")
+
+tbl_regression(
+  model_logistic, 
+  exponentiate = TRUE,
+  label = list(
+    RIDAGEYR                    ~ "Age (years)",
+    RIAGENDR                    ~ "Sex",
+    RIDRETH3                    ~ "Race/Ethnicity",
+    dmdeduc2_collapsed          ~ "Education",
+    `log(INDFMPIR + 0.01)`      ~ "Income-to-poverty ratio (log)",
+    fsdad_recoded               ~ "Food Security",
+    activity                    ~ "Physical Activity",
+    smoking_status              ~ "Smoking Status",
+    ALQ130                      ~ "Avg Drinks/Day",
+    sleep_hr                    ~ "Sleep Duration (hours)"
+  )
+  )
+```
+
+
+```{r}
+#| label: fig-2
+#| fig_cap: "Forest plot of survey-weighted logistic regression model estimates for depression among U.S. adults aged 18 and older, NHANES 2013–2018 (n = 10350)."
+
+tidy(model_logistic, exponentiate = TRUE, conf.int = TRUE) |>
+  filter(term != "(Intercept)") |>
+  mutate(term = fct_recode(term,
+                           "Food security: Very low"          = "fsdad_recodedVery low",
+                           "Food security: Low"               = "fsdad_recodedLow",
+                           "Food security: Marginal"          = "fsdad_recodedMarginal",
+                           "Smoking: Current"                 = "smoking_statusCurrent",
+                           "Smoking: Former"                  = "smoking_statusFormer",
+                           "Sex: Male"                        = "RIAGENDRMale",
+                           "Race: Mexican American"           = "RIDRETH3Mexican American",
+                           "Race: Non-Hispanic Asian"         = "RIDRETH3Non-Hispanic Asian",
+                           "Race: Non-Hispanic Black"         = "RIDRETH3Non-Hispanic Black",
+                           "Race: Other Hispanic"             = "RIDRETH3Other Hispanic",
+                           "Race: Other/Multi-Racial"         = "RIDRETH3Other Race - Including Multi-Racial",
+                           "Education: < High school"         = "dmdeduc2_collapsedLess than high school",
+                           "Education: High school/GED"       = "dmdeduc2_collapsedHigh school/GED",
+                           "Education: Some college"          = "dmdeduc2_collapsedSome college",
+                           "Physical activity: None"          = "activityNone",
+                           "Physical activity: Moderate"      = "activityModerate",
+                           "Income-to-poverty ratio (log)"    = "log(INDFMPIR + 0.01)",
+                           "Avg drinks/day"                   = "ALQ130",
+                           "Sleep duration (hours)"           = "sleep_hr",
+                           "Age (years)"                      = "RIDAGEYR"
+  )) |> 
+  ggplot(aes(x = estimate, y = term)) +
+  geom_point() +
+  geom_errorbar(aes(xmin = conf.low, xmax = conf.high), orientation = "y", width = 0.2) +
+  geom_vline(xintercept = 1, color = "red", linetype = "dashed") +
+  theme_minimal() +
+  labs(
+    x = "Odds Ratio", 
+    y = NULL,
+    title = "Logistic Regression: Odds Ratios for Depression",
+    caption = "Odds ratios and confidence intervals for depression from the survey-weighted 
+    logistic regression model. NHANES 2013-2018"
+  ) 
+```
+
+
+After adjusting for all covariates, food security remained the strongest predictor of depression (@tbl-2, @fig-2). Compared to full food security, very low food security was associated with 3.48 times the odds of depression (95% CI: 2.68–4.50), with a clear dose-response gradient through marginal (OR 1.92) and low (OR 2.64) food security levels. Current smoking was associated with more than twice the odds of depression compared to never smoking (OR 2.11, 95% CI: 1.56–2.84). Male sex was strongly protective (OR 0.48, 95% CI: 0.37–0.62). Each unit increase in log income-to-poverty ratio was associated with 16% lower odds of depression (OR 0.84, 95% CI: 0.78–0.91). Less than high school education was associated with 79% higher odds compared to college graduates (OR 1.79, 95% CI: 1.28–2.51), while higher education levels were not significantly different from the reference group after adjustment. Physical activity and alcohol consumption were not significantly associated with depression after adjustment.
+
+Regarding race and ethnicity, relative to Non-Hispanic White adults, Mexican American (OR 0.51), Non-Hispanic Asian (OR 0.64), and Non-Hispanic Black (OR 0.80) adults had significantly lower odds of depression, while Other Race/Multi-Racial adults had higher odds (OR 1.62).
+
+## LASSO
+
+```{r}
+#|label: fig-3
+#|fig-cap: "Normalized coefficients of LASSO-selected predictors of depression among U.S. adults aged 18 and older, NHANES 2013–2018 (n = 10350)."
+
+last_fit_result <- read_rds("output/models/lasso_final_fit.rds")
+
+last_fit_result |> 
+  extract_fit_parsnip() |> 
+  tidy() |> 
+  filter(term != "(Intercept)", estimate != 0) |> 
+  mutate(
+    term = fct_recode(term,
+                      "Income-to-poverty ratio (log)"  = "INDFMPIR",
+                      "Avg drinks/day"                 = "ALQ130",
+                      "Sleep duration (hours)"         = "sleep_hr",
+                      "Sex: Male"                      = "RIAGENDR_Male",
+                      "Race: Mexican American"         = "RIDRETH3_Mexican.American",
+                      "Race: Non-Hispanic Asian"       = "RIDRETH3_Non.Hispanic.Asian",
+                      "Race: Other/Multi-Racial"       = "RIDRETH3_Other.Race...Including.Multi.Racial",
+                      "Education: < High school"       = "dmdeduc2_collapsed_Less.than.high.school",
+                      "Food security: Marginal"        = "fsdad_recoded_Marginal",
+                      "Food security: Low"             = "fsdad_recoded_Low",
+                      "Food security: Very low"        = "fsdad_recoded_Very.low",
+                      "Smoking: Former"                = "smoking_status_Former",
+                      "Smoking: Current"               = "smoking_status_Current"
+    ),
+    direction = if_else(estimate > 0, "Higher risk", "Lower risk")
+  ) |> 
+  ggplot(aes(x = estimate, y = fct_reorder(term, estimate), fill = direction)) +
+  geom_col() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  scale_fill_manual(values = c("Higher risk" = "#d73027", "Lower risk" = "#4575b4")) +
+  theme_minimal() +
+  labs(x = "Coefficient (normalized)", y = NULL, fill = NULL,
+       title = "LASSO: Selected Predictors of Depression") +
+  theme(legend.position = "bottom") +
+  labs(caption = "Coefficients are on the normalized scale. Variables shrunk to zero by LASSO are excluded. NHANES 2013-2018")
+```
+
+The LASSO model selected 13 of 20 predictors as informative, shrinking physical activity (both levels), age, and most race/ethnicity categories to zero (@fig-3). The strongest surviving predictors were very low food security, current smoking, and male sex — consistent with the logistic regression findings. Income, less than high school education, and marginal and low food security also survived penalization, reinforcing their independent contributions to depression risk.
+
+## Random Forest
+```{r}
+#| label: fig-4
+#| fig-cap: "Variable importance plot of the random forest model of depression among U.S. adults aged 18 and older, NHANES 2013–2018 (n = 10350)."
+
+rf_last_fit <- readRDS("output/models/rf_last_fit.rds")
+
+rf_last_fit |> 
+  extract_fit_parsnip() |> 
+  vi() |> 
+  filter(Importance >= 0) |> 
+  mutate(
+    Variable = fct_recode(Variable,
+                          "Income-to-poverty ratio"        = "INDFMPIR",
+                          "Food security: Very low"        = "fsdad_recoded_Very.low",
+                          "Smoking: Current"               = "smoking_status_Current",
+                          "Sex: Male"                      = "RIAGENDR_Male",
+                          "Food security: Low"             = "fsdad_recoded_Low",
+                          "Education: < High school"       = "dmdeduc2_collapsed_Less.than.high.school",
+                          "Sleep duration (hours)"         = "sleep_hr",
+                          "Age (years)"                    = "RIDAGEYR",
+                          "Avg drinks/day"                 = "ALQ130",
+                          "Food security: Marginal"        = "fsdad_recoded_Marginal",
+                          "Race: Non-Hispanic Asian"       = "RIDRETH3_Non.Hispanic.Asian",
+                          "Race: Mexican American"         = "RIDRETH3_Mexican.American",
+                          "Smoking: Former"                = "smoking_status_Former",
+                          "Education: High school/GED"     = "dmdeduc2_collapsed_High.school.GED",
+                          "Education: Some college"        = "dmdeduc2_collapsed_Some.college",
+                          "Race: Non-Hispanic Black"       = "RIDRETH3_Non.Hispanic.Black",
+                          "Race: Other Hispanic"           = "RIDRETH3_Other.Hispanic",
+                          "Physical activity: None"        = "activity_None",
+                          "Race: Other/Multi-Racial"       = "RIDRETH3_Other.Race...Including.Multi.Racial",
+    )
+  ) |> 
+  ggplot(aes(x = Importance, y = fct_reorder(Variable, Importance))) +
+  geom_col(fill = "#4575b4") +
+  theme_minimal() +
+  labs(
+    x = "Permutation Importance",
+    y = NULL, 
+    title = "Random Forest: Variable Importance", 
+    caption = "Importance measured by mean decrease in AUC after permutation. NHANES 2013-18"
+  )
+```
+
+The random forest model achieved the highest test-set AUC of the three models (0.726) and broadly confirmed the findings of the logistic regression and LASSO (@fig-4). Income-to-poverty ratio emerged as the top predictor by permutation importance, followed by very low food security and current smoking. Notably, age emerged as a moderately important predictor in the random forest despite being non-significant in the logistic regression, suggesting a non-linear age-depression relationship that the linear model did not fully capture.
+
+## Model Comparison
+```{r}
+#| label: fig-5
+#| fig-cap: "Area Under the Curve (AUC) comparison of the survey-weighted logistic regression, LASSO regression, and random forest models of depression among U.S. adults aged 18 and older, NHANES 2013–2018 (n = 10350)"
+
+model_comp <- tribble(
+  ~Model                        ,    ~AUC,
+  "Weighted logistic regression",   0.714,
+  "LASSO regression"            ,   0.723,
+  "Random forest"               ,   0.727
+)
+
+model_comp |> 
+  ggplot(aes(x = AUC, y = Model)) +
+  geom_col(fill = "#4575b4", width = 0.5) +
+  geom_text(aes(label = round(AUC, 3)), hjust = -0.2) +
+  geom_vline(xintercept = 0.5, linetype = "dashed", color = "red") +
+  scale_x_continuous(limits = c(0, 0.80)) +
+  theme_minimal() +
+  labs(
+    x = "Test-set AUC",
+    y = NULL,
+    title = "Model Comparison: Discriminative Performance",
+    caption = "Dashed line represents random chance (AUC = 0.5). NHANES 2013-18."
+  )
+```
+
+All three models performed similarly on the held-out test set, with AUC values ranging from 0.714 (logistic regression) to 0.726 (random forest) (Figure 5). The modest improvement of the random forest over logistic regression suggests that relationships between social determinants and depression are largely linear and additive, with limited non-linear or interaction effects. The consistent performance across models reinforces the robustness of the findings.
