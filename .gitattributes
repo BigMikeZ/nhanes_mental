@@ -1,1 +1,3 @@
+docs/index.html linguist-vendored=true
 *.html linguist-generated=true
+*.html linguist-vendored=true
