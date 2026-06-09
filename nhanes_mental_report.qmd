@@ -8,7 +8,7 @@ format:
     toc-depth: 3
     number-sections: true
     theme: cosmo
-    self-contained: true
+    embed-resources: true
     output-file: index.html
     output-dir: docs
 execute:
