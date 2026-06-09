@@ -36,8 +36,8 @@ All the data involved in this analysis came from the National Health and Nutriti
 ## Reproducing the Analysis
 1. Clone the repository
 2. Install required packages (see scripts for full list)
-3. Run scripts in order: `01_download_data.R` → `05_visualizations.R`
-4. Render `report/nhanes_survival_report.qmd` to generate the final report
+3. Run scripts in order: `01_download_data.R` → `04_modeling.R`
+4. Render `report/nhanes_mental_report.qmd` to generate the final report
 
 ## Repository Structure 
 ```
