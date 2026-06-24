@@ -25,7 +25,6 @@ library(gtsummary)
 library(broom)
 library(tidymodels)
 library(vip)
-library(naniar)
 
 nhanes_clean <- readRDS("data/processed/nhanes_clean.rds")
 nhanes_clean_full <- readRDS("data/processed/nhanes_clean_full.rds")
