@@ -196,7 +196,8 @@ tbl_regression(
     ALQ130                      ~ "Avg Drinks/Day",
     sleep_hr                    ~ "Sleep Duration (hours)"
   )
-  )
+  ) |> 
+  modify_header(label = "**Variable**") 
 ```
 
 ```{r}
