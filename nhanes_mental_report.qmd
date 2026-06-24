@@ -92,8 +92,8 @@ tbl_svysummary(
   nhanes_svy,
   by      = depressed,
   include = c(RIDAGEYR, RIAGENDR, RIDRETH3, INDFMPIR, ALQ130,
-              sleep_hr, phq9_score, dmdeduc2_collapsed, fsdad_recoded, smoking_status,
-              activity),
+              sleep_hr, phq9_score, dmdeduc2_collapsed, fsdad_recoded, 
+              smoking_status, activity),
   statistic = list(
     all_continuous()  ~ "{mean} ({sd})",
     all_categorical() ~ "{p}%"
