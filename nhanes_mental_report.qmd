@@ -114,7 +114,8 @@ tbl_svysummary(
   )
  ) |> 
   add_p() |> 
-  add_overall()
+  add_overall() |> 
+  modify_spanning_header(c("stat_1", "stat_2") ~ "**Depressed**")
 ```
 
 The final analytic sample comprised 10,350 US adults, representing an estimated 164 million Americans after survey weighting. The weighted prevalence of moderate-to-severe depression was 7.9%. The sample was approximately evenly split by sex (50.1% female), with a mean age of 46.9 years. Non-Hispanic White adults comprised the largest racial/ethnic group (67.4%), followed by Non-Hispanic Black (10.2%), Mexican American (8.1%), and Other Hispanic (5.5%) adults. About three-quarters of respondents reported full food security (74.3%), while 7.6% reported very low food security. Current smokers comprised 19.7% of the sample. Full sample characteristics are presented in @tbl-1.
